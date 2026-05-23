@@ -159,8 +159,35 @@ npm run db:import
 > ⚠️ 클라우드 웹 세션은 기본적으로 외부 접속이 차단될 수 있습니다. 네트워크 정책 설정은
 > [Claude Code on the web 문서](https://code.claude.com/docs/en/claude-code-on-the-web)를 참고하세요.
 
+## 🚀 배포 (Vercel + Neon, 브라우저만으로)
+
+CLI 없이 브라우저에서만 진행하는 절차입니다. 프론트(`client/dist` 정적) + 백엔드(`server/index.js` 서버리스 함수)가 `vercel.json` 한 파일로 함께 배포됩니다.
+
+### 1) 관리형 PostgreSQL 생성 (Neon 예시)
+1. [neon.tech](https://neon.tech) 가입 → 프로젝트 생성
+2. **SQL Editor**를 열고 `database/schema.sql` 전체를 붙여넣어 실행 (테이블 생성)
+3. 이어서 `database/seed.sql`을 붙여넣어 실행 (샘플 데이터)
+4. **Connection string**(`postgresql://...`) 복사 → 이게 `DATABASE_URL`
+
+> Supabase도 동일: SQL Editor에 schema → seed 실행 후 Connection string 복사.
+
+### 2) Vercel에 GitHub 저장소 연결
+1. [vercel.com/new](https://vercel.com/new) → 이 GitHub 저장소 **Import**
+2. Framework Preset은 **Other**(자동 감지) — `vercel.json`이 빌드를 정의함
+3. **Environment Variables** 추가:
+   - `DATABASE_URL` = 1)에서 복사한 연결 문자열
+   - (선택) `PGSSL` 미설정 시 프로덕션에서 자동으로 SSL 사용
+4. **Deploy** 클릭
+
+### 3) 확인
+- 배포 URL 접속 → 부대 식단/병사 추적/통계 화면 동작
+- `https://<배포주소>/api/health` → `{"status":"OK"}`
+
+> ⚠️ `DATABASE_URL`을 설정하지 않으면 화면은 뜨지만 API가 500을 반환합니다(DB 미연결).
+> 식재료 1,000+ 적재는 위 "식재료 대량 임포트"를 네트워크 가능한 환경에서 실행하거나,
+> data.go.kr에서 받은 데이터를 Neon SQL Editor로 직접 넣으면 됩니다.
+
 ## 🚧 다음 단계
 
 - 인증: 부대 PIN / JWT
 - 식재료 임포트 실행 후 검색 품질 점검 (동의어/분류 보강)
-- Vercel 배포 + 관리형 PostgreSQL(Neon/Supabase) 연결
