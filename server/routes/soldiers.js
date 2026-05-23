@@ -4,7 +4,11 @@ const asyncRoute = require('../utils/asyncRoute');
 
 const router = express.Router();
 
-const SOLDIER_FIELDS = ['unit_id', 'name', 'rank', 'daily_calorie_goal', 'daily_protein_goal', 'daily_carb_goal', 'daily_fat_goal'];
+const SOLDIER_FIELDS = [
+  'unit_id', 'name', 'rank',
+  'daily_calorie_goal', 'daily_protein_goal', 'daily_carb_goal', 'daily_fat_goal',
+  'goal_type', 'sex', 'age', 'height_cm', 'weight_kg', 'activity_level',
+];
 
 function pickSoldier(body) {
   const out = {};

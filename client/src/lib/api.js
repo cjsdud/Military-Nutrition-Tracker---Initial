@@ -33,7 +33,9 @@ export const api = {
 
   // soldiers
   listSoldiers: (unitId) => request(`/soldiers${unitId ? `?unit_id=${unitId}` : ''}`),
+  getSoldier: (id) => request(`/soldiers/${id}`),
   createSoldier: (body) => request('/soldiers', { method: 'POST', body }),
+  updateSoldier: (id, body) => request(`/soldiers/${id}`, { method: 'PUT', body }),
   getFavorites: (soldierId) => request(`/soldiers/${soldierId}/favorites`),
   addFavorite: (soldierId, body) => request(`/soldiers/${soldierId}/favorites`, { method: 'POST', body }),
   removeFavorite: (soldierId, foodId) => request(`/soldiers/${soldierId}/favorites/${foodId}`, { method: 'DELETE' }),
