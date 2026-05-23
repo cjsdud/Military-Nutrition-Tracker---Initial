@@ -134,35 +134,41 @@ router.post('/duplicate', asyncRoute(async (req, res) => {
   res.json({ copied });
 }));
 
-// 부대 식단 끼니 빠짐 (외출/회식 등)
-router.post('/skip', asyncRoute(async (req, res) => {
-  const { soldier_id, skip_date, meal_type, reason } = req.body || {};
-  if (!soldier_id || !skip_date || !meal_type) {
-    return res.status(400).json({ error: 'soldier_id, skip_date, meal_type 필수' });
+// 부대 식단 끼니별 섭취량 조절 (안 먹음=0, 적게=0.5, 보통=1, 많이=1.5)
+// portion === 1(보통)이면 override를 삭제(기본값으로 복귀)
+router.post('/portion', asyncRoute(async (req, res) => {
+  const { soldier_id, log_date, meal_type, portion, reason } = req.body || {};
+  if (!soldier_id || !log_date || !meal_type || portion == null) {
+    return res.status(400).json({ error: 'soldier_id, log_date, meal_type, portion 필수' });
+  }
+  const p = Number(portion);
+  if (!Number.isFinite(p) || p < 0 || p > 3) {
+    return res.status(400).json({ error: 'portion은 0~3 사이 숫자' });
+  }
+  if (p === 1) {
+    await query(
+      'DELETE FROM soldier_meal_skips WHERE soldier_id = $1 AND skip_date = $2 AND meal_type = $3',
+      [soldier_id, log_date, meal_type]
+    );
+    return res.json({ meal_type, portion: 1 });
   }
   const { rows } = await query(
-    `INSERT INTO soldier_meal_skips (soldier_id, skip_date, meal_type, reason)
-     VALUES ($1, $2, $3, $4)
+    `INSERT INTO soldier_meal_skips (soldier_id, skip_date, meal_type, portion, reason)
+     VALUES ($1, $2, $3, $4, $5)
      ON CONFLICT (soldier_id, skip_date, meal_type)
-     DO UPDATE SET reason = EXCLUDED.reason
-     RETURNING *`,
-    [soldier_id, skip_date, meal_type, reason || null]
+     DO UPDATE SET portion = EXCLUDED.portion, reason = EXCLUDED.reason
+     RETURNING meal_type, portion`,
+    [soldier_id, log_date, meal_type, p, reason || null]
   );
   res.status(201).json(rows[0]);
 }));
 
-router.delete('/skip/:skip_id', asyncRoute(async (req, res) => {
-  const { rowCount } = await query('DELETE FROM soldier_meal_skips WHERE id = $1', [req.params.skip_id]);
-  if (!rowCount) return res.status(404).json({ error: '기록을 찾을 수 없습니다' });
-  res.json({ deleted: true });
-}));
-
-router.get('/skip/:soldier_id/:date', asyncRoute(async (req, res) => {
+router.get('/portion/:soldier_id/:date', asyncRoute(async (req, res) => {
   const { rows } = await query(
-    'SELECT * FROM soldier_meal_skips WHERE soldier_id = $1 AND skip_date = $2',
+    'SELECT meal_type, portion FROM soldier_meal_skips WHERE soldier_id = $1 AND skip_date = $2',
     [req.params.soldier_id, req.params.date]
   );
-  res.json(rows);
+  res.json(rows.map((r) => ({ meal_type: r.meal_type, portion: Number(r.portion) })));
 }));
 
 module.exports = router;

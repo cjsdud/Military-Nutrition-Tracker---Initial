@@ -2,9 +2,11 @@ const express = require('express');
 const { query } = require('../db');
 const asyncRoute = require('../utils/asyncRoute');
 const {
-  scaleFood, scaleCustom, sumNutrients, emptyTotals, addTotals,
+  scaleFood, scaleCustom, sumNutrients, emptyTotals, addTotals, scaleBy,
   NUTRIENT_KEYS, MACRO_KEYS, round1,
 } = require('../utils/nutrition');
+
+const UNIT_MEAL_TYPES = ['breakfast', 'lunch', 'dinner'];
 
 const router = express.Router();
 
@@ -92,11 +94,14 @@ router.get('/soldier-stats/:soldier_id/:date', asyncRoute(async (req, res) => {
   if (!soldierRows[0]) return res.status(404).json({ error: '병사를 찾을 수 없습니다' });
   const soldier = soldierRows[0];
 
-  const { rows: skipRows } = await query(
-    'SELECT meal_type FROM soldier_meal_skips WHERE soldier_id = $1 AND skip_date = $2',
+  const { rows: portionRows } = await query(
+    'SELECT meal_type, portion FROM soldier_meal_skips WHERE soldier_id = $1 AND skip_date = $2',
     [soldier_id, date]
   );
-  const skipped = new Set(skipRows.map((r) => r.meal_type));
+  const portionMap = new Map(portionRows.map((r) => [r.meal_type, Number(r.portion)]));
+  const meal_portions = Object.fromEntries(
+    UNIT_MEAL_TYPES.map((t) => [t, portionMap.has(t) ? portionMap.get(t) : 1])
+  );
 
   const { rows: mealRows } = await query(
     `SELECT m.meal_type, mf.quantity,
@@ -111,8 +116,9 @@ router.get('/soldier-stats/:soldier_id/:date', asyncRoute(async (req, res) => {
   const unit_meals = emptyTotals(MACRO_KEYS);
   const unit_by_meal = { breakfast: emptyTotals(MACRO_KEYS), lunch: emptyTotals(MACRO_KEYS), dinner: emptyTotals(MACRO_KEYS) };
   for (const r of mealRows) {
-    if (skipped.has(r.meal_type) || r.calorie == null) continue;
-    const scaled = scaleFood(r, r.quantity);
+    const factor = portionMap.has(r.meal_type) ? portionMap.get(r.meal_type) : 1;
+    if (factor === 0 || r.calorie == null) continue;
+    const scaled = scaleBy(scaleFood(r, r.quantity), factor);
     addTotals(unit_meals, scaled);
     if (unit_by_meal[r.meal_type]) addTotals(unit_by_meal[r.meal_type], scaled);
   }
@@ -154,7 +160,7 @@ router.get('/soldier-stats/:soldier_id/:date', asyncRoute(async (req, res) => {
   res.json({
     date,
     soldier: { id: soldier.id, name: soldier.name, rank: soldier.rank },
-    skipped_meals: Array.from(skipped),
+    meal_portions,
     unit_meals,
     unit_by_meal,
     additional_logs,
@@ -173,15 +179,15 @@ router.get('/soldier-stats/:soldier_id/:year/:month', asyncRoute(async (req, res
   if (!soldierRows[0]) return res.status(404).json({ error: '병사를 찾을 수 없습니다' });
   const soldier = soldierRows[0];
 
-  const { rows: skipRows } = await query(
-    'SELECT skip_date, meal_type FROM soldier_meal_skips WHERE soldier_id = $1 AND skip_date >= $2 AND skip_date < $3',
+  const { rows: portionRows } = await query(
+    'SELECT skip_date, meal_type, portion FROM soldier_meal_skips WHERE soldier_id = $1 AND skip_date >= $2 AND skip_date < $3',
     [soldier_id, start, end]
   );
-  const skipMap = new Map();
-  for (const r of skipRows) {
+  const portionMap = new Map();
+  for (const r of portionRows) {
     const k = r.skip_date.toISOString().slice(0, 10);
-    if (!skipMap.has(k)) skipMap.set(k, new Set());
-    skipMap.get(k).add(r.meal_type);
+    if (!portionMap.has(k)) portionMap.set(k, new Map());
+    portionMap.get(k).set(r.meal_type, Number(r.portion));
   }
 
   const { rows: mealRows } = await query(
@@ -204,9 +210,9 @@ router.get('/soldier-stats/:soldier_id/:year/:month', asyncRoute(async (req, res
   };
   for (const r of mealRows) {
     const d = r.meal_date.toISOString().slice(0, 10);
-    if (skipMap.get(d)?.has(r.meal_type)) continue;
-    if (r.calorie == null) continue;
-    addTotals(ensure(d).unit_total, scaleFood(r, r.quantity));
+    const factor = portionMap.get(d)?.has(r.meal_type) ? portionMap.get(d).get(r.meal_type) : 1;
+    if (factor === 0 || r.calorie == null) continue;
+    addTotals(ensure(d).unit_total, scaleBy(scaleFood(r, r.quantity), factor));
   }
 
   const { rows: logRows } = await query(
