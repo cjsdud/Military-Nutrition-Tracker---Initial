@@ -1,6 +1,6 @@
 {
   "buildCommand": "npm install",
-  "framework": "none",
+  "framework": "express",
   "env": {
     "NODE_ENV": "production"
   }
