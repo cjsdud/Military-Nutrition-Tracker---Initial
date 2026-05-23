@@ -48,6 +48,12 @@ CREATE TABLE IF NOT EXISTS soldiers (
   daily_protein_goal INT,
   daily_carb_goal INT,
   daily_fat_goal INT,
+  goal_type VARCHAR(20),
+  sex VARCHAR(10),
+  age INT,
+  height_cm INT,
+  weight_kg DECIMAL(5, 1),
+  activity_level VARCHAR(20),
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 

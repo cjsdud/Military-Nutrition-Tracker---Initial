@@ -4,6 +4,7 @@ import { MEAL_LABELS, todayISO, kcal, shiftDate, formatDateKo } from '../lib/for
 import DateNav from '../components/DateNav';
 import NutritionTotals from '../components/NutritionTotals';
 import FoodSearchModal from '../components/FoodSearchModal';
+import GoalSettingsModal from '../components/GoalSettingsModal';
 
 const SKIP_TYPES = ['breakfast', 'lunch', 'dinner'];
 
@@ -18,6 +19,7 @@ export default function SoldierTracker() {
   const [skips, setSkips] = useState([]);
   const [error, setError] = useState('');
   const [modal, setModal] = useState(false);
+  const [goalModal, setGoalModal] = useState(false);
 
   useEffect(() => {
     api.listUnits().then((u) => { setUnits(u); if (u[0]) setUnitId(u[0].id); }).catch((e) => setError(e.message));
@@ -27,6 +29,16 @@ export default function SoldierTracker() {
     if (!unitId) return;
     api.listSoldiers(unitId).then((s) => { setSoldiers(s); setSoldierId(s[0]?.id || null); }).catch((e) => setError(e.message));
   }, [unitId]);
+
+  const selectedSoldier = soldiers.find((s) => s.id === soldierId) || null;
+
+  const onGoalsSaved = async () => {
+    if (unitId) {
+      const s = await api.listSoldiers(unitId);
+      setSoldiers(s);
+    }
+    await load();
+  };
 
   const load = async () => {
     if (!soldierId) { setStats(null); setLogs([]); setSkips([]); return; }
@@ -84,6 +96,7 @@ export default function SoldierTracker() {
           {soldiers.map((s) => <option key={s.id} value={s.id}>{s.rank} {s.name}</option>)}
         </select>
         <DateNav date={date} onChange={setDate} />
+        <button className="btn-ghost text-sm" disabled={!selectedSoldier} onClick={() => setGoalModal(true)}>🎯 목표 설정</button>
       </div>
 
       {error && <div className="card border-red-200 bg-red-50 p-3 text-sm text-red-600">{error}</div>}
@@ -144,6 +157,7 @@ export default function SoldierTracker() {
       )}
 
       <FoodSearchModal open={modal} onClose={() => setModal(false)} onSelect={addLog} allowCustom />
+      <GoalSettingsModal open={goalModal} soldier={selectedSoldier} onClose={() => setGoalModal(false)} onSaved={onGoalsSaved} />
     </div>
   );
 }
