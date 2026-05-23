@@ -1,0 +1,7 @@
+{
+  "buildCommand": "npm install",
+  "framework": "none",
+  "env": {
+    "NODE_ENV": "production"
+  }
+}
