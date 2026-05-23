@@ -23,26 +23,47 @@
 
 - **백엔드**: Node.js + Express
 - **DB**: PostgreSQL (`pg` 클라이언트, Neon/Supabase/Vercel Postgres 호환)
+- **프론트엔드**: React 18 + Vite + Tailwind CSS + Recharts (`client/`)
 - **배포**: Vercel Serverless
 
 ## 🚀 개발 환경 실행
 
+### 1) 백엔드
+
 ```bash
-# 1) 의존성 설치
+# 의존성 설치
 npm install
 
-# 2) 환경 변수 설정 (.env)
+# 환경 변수 설정 (.env)
 cp .env.example .env
 # DATABASE_URL=postgres://user:pass@localhost:5432/military_nutrition
 
-# 3) 스키마 생성 + 시드 데이터
+# 스키마 생성 + 시드 데이터
 npm run db:migrate
 npm run db:seed
 
-# 4) 서버 실행
+# 서버 실행
 npm start
 # http://localhost:5000
 ```
+
+### 2) 프론트엔드
+
+```bash
+cd client
+npm install
+npm run dev
+# http://localhost:5173  (개발 중 /api 요청은 자동으로 localhost:5000 백엔드로 프록시)
+```
+
+빌드: `npm run build` → `client/dist/` 정적 파일 생성.
+
+## 🖥️ 화면 구성 (client/)
+
+- **부대 식단** (`/meals`): 부대·날짜 선택 → 조식/중식/석식에 음식 추가 → 자동 영양가 계산, 어제 식단 복사
+- **병사 추적** (`/soldiers`): 부대 식단 자동 합산 + 개인 음식 로깅(직접 입력 포함), 외출/회식 끼니 제외, 어제 그대로 복사, 목표 대비 달성률
+- **통계** (`/stats`): 월간 일평균 지표, 일별 칼로리 추이(선형) + 영양소(막대) 그래프, 식단 작성 누락 일자 확인
+- 모바일: 하단 탭 네비게이션, 44px 터치 타깃, 모달 바텀시트
 
 ## 📚 API 개요
 
