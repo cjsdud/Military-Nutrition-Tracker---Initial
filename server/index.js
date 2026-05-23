@@ -1,24 +1,48 @@
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 
+const unitsRouter = require('./routes/units');
+const foodsRouter = require('./routes/foods');
+const mealsRouter = require('./routes/meals');
+const soldiersRouter = require('./routes/soldiers');
+const soldierLogsRouter = require('./routes/soldierLogs');
+const statsRouter = require('./routes/stats');
+
 const app = express();
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '2mb' }));
 
-// 헬스 체크
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'OK', message: '서버가 정상 작동 중입니다' });
+app.get('/api/health', (_req, res) => {
+  res.json({
+    status: 'OK',
+    timestamp: new Date().toISOString(),
+    version: require('../package.json').version,
+  });
 });
 
-// 부대 목록 (임시 데이터)
-app.get('/api/units', (req, res) => {
-  res.json([
-    { id: 1, name: '제5322부대', code: 'UNIT001' }
-  ]);
+app.use('/api/units', unitsRouter);
+app.use('/api/foods', foodsRouter);
+app.use('/api/meals', mealsRouter);
+app.use('/api/soldiers', soldiersRouter);
+app.use('/api/soldier-logs', soldierLogsRouter);
+app.use('/api', statsRouter);
+
+app.use((req, res) => {
+  res.status(404).json({ error: 'Not Found', path: req.path });
 });
 
-// 서버 시작
+app.use((err, _req, res, _next) => {
+  const status = err.status || 500;
+  if (status >= 500) console.error(err);
+  res.status(status).json({ error: err.message || 'Internal Server Error' });
+});
+
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-  console.log(`✅ 서버 실행 중: http://localhost:${PORT}`);
-});
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log(`✅ 서버 실행 중: http://localhost:${PORT}`);
+  });
+}
+
+module.exports = app;
