@@ -130,12 +130,37 @@ GET /api/soldier-stats/1/2026-05-23
 │   ├── schema.sql        # PostgreSQL 스키마
 │   ├── seed.sql          # 샘플 데이터 (부대/식재료/병사)
 │   ├── migrate.js
-│   └── seed.js
+│   ├── seed.js
+│   └── import_openapi.js # 식약처 식품영양성분 OpenAPI 임포터
 └── vercel.json
 ```
 
+## 🥗 식재료 대량 임포트 (식약처 OpenAPI)
+
+[data.go.kr](https://www.data.go.kr)에서 "식품영양성분 데이터베이스" 활용신청 후 인증키를 받아 1,000+ 식재료를 적재합니다. 외부 네트워크 접속이 가능한 환경에서 실행하세요.
+
+```bash
+# .env 에 DATA_GO_KR_KEY 설정 후
+
+# 1) 실제 응답 필드명/매핑이 맞는지 먼저 확인 (1건만 조회)
+DATA_GO_KR_KEY=... npm run db:import -- --inspect
+
+# 2) 소량 시험 (DB 미반영)
+npm run db:import -- --pages=2 --dry-run
+
+# 3) 전체 적재 (이름 중복 시 갱신)
+npm run db:import
+```
+
+- 필드명이 API 버전에 따라 다를 수 있어 **여러 후보를 자동 매핑**하며, `--inspect`로 원본 필드를 확인할 수 있습니다.
+- 모든 영양성분은 함량 기준량(예: `1회제공량(30g)`)을 파싱해 **100g 기준으로 정규화**되어 저장됩니다.
+- 구버전 API(`I2790`, `NUTR_CONT*` 필드)는 `FOOD_API_VARIANT=i2790`로 전환 가능합니다.
+
+> ⚠️ 클라우드 웹 세션은 기본적으로 외부 접속이 차단될 수 있습니다. 네트워크 정책 설정은
+> [Claude Code on the web 문서](https://code.claude.com/docs/en/claude-code-on-the-web)를 참고하세요.
+
 ## 🚧 다음 단계
 
-- React(Vite) 프론트엔드: 부대 식단 입력 UI, 병사 개인 트래커, 통계 그래프
 - 인증: 부대 PIN / JWT
-- 농식품올바로 1,000+ 식재료 크롤링 후 `POST /api/foods/bulk`로 임포트
+- 식재료 임포트 실행 후 검색 품질 점검 (동의어/분류 보강)
+- Vercel 배포 + 관리형 PostgreSQL(Neon/Supabase) 연결

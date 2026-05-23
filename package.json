@@ -7,7 +7,8 @@
     "start": "node server/index.js",
     "dev": "node server/index.js",
     "db:migrate": "node database/migrate.js",
-    "db:seed": "node database/seed.js"
+    "db:seed": "node database/seed.js",
+    "db:import": "node database/import_openapi.js"
   },
   "dependencies": {
     "cors": "^2.8.5",
