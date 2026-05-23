@@ -1,12 +1,18 @@
 import { useEffect, useState } from 'react';
 import { api } from '../lib/api';
-import { MEAL_LABELS, todayISO, kcal, shiftDate, formatDateKo } from '../lib/format';
+import { MEAL_LABELS, todayISO, kcal, shiftDate } from '../lib/format';
 import DateNav from '../components/DateNav';
 import NutritionTotals from '../components/NutritionTotals';
 import FoodSearchModal from '../components/FoodSearchModal';
 import GoalSettingsModal from '../components/GoalSettingsModal';
 
-const SKIP_TYPES = ['breakfast', 'lunch', 'dinner'];
+const UNIT_MEALS = ['breakfast', 'lunch', 'dinner'];
+const PORTIONS = [
+  { v: 0, label: '안 먹음' },
+  { v: 0.5, label: '적게' },
+  { v: 1, label: '보통' },
+  { v: 1.5, label: '많이' },
+];
 
 export default function SoldierTracker() {
   const [units, setUnits] = useState([]);
@@ -16,7 +22,8 @@ export default function SoldierTracker() {
   const [date, setDate] = useState(todayISO());
   const [stats, setStats] = useState(null);
   const [logs, setLogs] = useState([]);
-  const [skips, setSkips] = useState([]);
+  const [unitMeals, setUnitMeals] = useState(null);
+  const [portions, setPortions] = useState({});
   const [error, setError] = useState('');
   const [modal, setModal] = useState(false);
   const [goalModal, setGoalModal] = useState(false);
@@ -32,24 +39,18 @@ export default function SoldierTracker() {
 
   const selectedSoldier = soldiers.find((s) => s.id === soldierId) || null;
 
-  const onGoalsSaved = async () => {
-    if (unitId) {
-      const s = await api.listSoldiers(unitId);
-      setSoldiers(s);
-    }
-    await load();
-  };
-
   const load = async () => {
-    if (!soldierId) { setStats(null); setLogs([]); setSkips([]); return; }
+    if (!soldierId || !unitId) { setStats(null); setLogs([]); setUnitMeals(null); setPortions({}); return; }
     setError('');
     try {
-      const [st, lg, sk] = await Promise.all([
+      const [st, lg, um, pr] = await Promise.all([
         api.soldierDay(soldierId, date),
         api.getLogs(soldierId, date),
-        api.getSkips(soldierId, date),
+        api.getDayMeals(unitId, date),
+        api.getPortions(soldierId, date),
       ]);
-      setStats(st); setLogs(lg); setSkips(sk);
+      setStats(st); setLogs(lg); setUnitMeals(um);
+      setPortions(Object.fromEntries(pr.map((p) => [p.meal_type, p.portion])));
     } catch (e) { setError(e.message); }
   };
 
@@ -71,10 +72,8 @@ export default function SoldierTracker() {
 
   const delLog = async (id) => { await api.deleteLog(id); await load(); };
 
-  const toggleSkip = async (type) => {
-    const existing = skips.find((s) => s.meal_type === type);
-    if (existing) await api.removeSkip(existing.id);
-    else await api.addSkip({ soldier_id: soldierId, skip_date: date, meal_type: type, reason: '외출/회식' });
+  const setPortionFor = async (type, value) => {
+    await api.setPortion({ soldier_id: soldierId, log_date: date, meal_type: type, portion: value });
     await load();
   };
 
@@ -83,7 +82,10 @@ export default function SoldierTracker() {
     await load();
   };
 
-  const skipped = new Set(skips.map((s) => s.meal_type));
+  const onGoalsSaved = async () => {
+    if (unitId) setSoldiers(await api.listSoldiers(unitId));
+    await load();
+  };
 
   return (
     <div className="space-y-4">
@@ -104,25 +106,52 @@ export default function SoldierTracker() {
       {stats && (
         <>
           <section className="card p-4">
-            <div className="mb-2 flex items-center justify-between">
-              <h2 className="font-bold">부대 식단 (자동)</h2>
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="font-bold">부대 식단</h2>
               <span className="text-sm font-semibold text-brand">{kcal(stats.unit_meals?.calorie || 0)}</span>
             </div>
-            <ul className="space-y-1 text-sm">
-              {SKIP_TYPES.map((t) => {
-                const isSkip = skipped.has(t);
+
+            <div className="space-y-3">
+              {UNIT_MEALS.map((t) => {
+                const meal = unitMeals?.[t];
+                const foods = meal?.foods || [];
+                const portion = portions[t] ?? 1;
+                const baseCal = meal?.totals?.calorie || 0;
                 return (
-                  <li key={t} className="flex items-center justify-between py-1">
-                    <span className={isSkip ? 'text-gray-300 line-through' : ''}>
-                      {MEAL_LABELS[t]} · {kcal(stats.unit_by_meal?.[t]?.calorie || 0)}
-                    </span>
-                    <button className={`text-xs underline ${isSkip ? 'text-brand' : 'text-gray-400'}`} onClick={() => toggleSkip(t)}>
-                      {isSkip ? '식사함으로 변경' : '외출/회식 (제외)'}
-                    </button>
-                  </li>
+                  <div key={t} className="rounded-lg border border-gray-100 p-3">
+                    <div className="mb-1 flex items-center justify-between">
+                      <span className="font-medium">{MEAL_LABELS[t]}</span>
+                      <span className="text-sm text-gray-500">
+                        {kcal(baseCal * portion)}
+                        {portion !== 1 && <span className="ml-1 text-xs text-gray-400">(원래 {kcal(baseCal)})</span>}
+                      </span>
+                    </div>
+
+                    {foods.length === 0 ? (
+                      <p className="mb-2 text-xs text-gray-400">등록된 식단이 없습니다.</p>
+                    ) : (
+                      <p className="mb-2 text-xs text-gray-500">
+                        {foods.map((f) => `${f.name}(${f.quantity}g)`).join(' · ')}
+                      </p>
+                    )}
+
+                    <div className="grid grid-cols-4 gap-1">
+                      {PORTIONS.map((p) => (
+                        <button
+                          key={p.v}
+                          onClick={() => setPortionFor(t, p.v)}
+                          className={`rounded-md py-1.5 text-xs font-medium transition-colors ${
+                            portion === p.v ? 'bg-brand text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                          }`}
+                        >
+                          {p.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 );
               })}
-            </ul>
+            </div>
           </section>
 
           <section className="card p-4">

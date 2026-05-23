@@ -54,6 +54,13 @@ function sumNutrients(items, keys = MACRO_KEYS) {
   return totals;
 }
 
+// 영양소 객체 전체에 배율을 곱함 (끼니별 섭취량 조절용: 0/0.5/1/1.5 등)
+function scaleBy(nutrition, factor) {
+  const out = {};
+  for (const k of Object.keys(nutrition)) out[k] = round1(Number(nutrition[k] || 0) * factor);
+  return out;
+}
+
 module.exports = {
   NUTRIENT_KEYS,
   MACRO_KEYS,
@@ -62,5 +69,6 @@ module.exports = {
   scaleCustom,
   addTotals,
   sumNutrients,
+  scaleBy,
   round1,
 };

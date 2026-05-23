@@ -76,12 +76,14 @@ CREATE TABLE IF NOT EXISTS soldier_logs (
   CHECK (food_id IS NOT NULL OR custom_name IS NOT NULL)
 );
 
--- 외출/회식 등으로 부대 식단에서 빠진 끼니
+-- 부대 식단 끼니별 섭취량 조절 (안 먹음=0, 적게=0.5, 보통=1, 많이=1.5)
+-- 행이 없으면 보통(1.0)으로 간주
 CREATE TABLE IF NOT EXISTS soldier_meal_skips (
   id SERIAL PRIMARY KEY,
   soldier_id INT REFERENCES soldiers(id) ON DELETE CASCADE,
   skip_date DATE NOT NULL,
   meal_type VARCHAR(50) NOT NULL,
+  portion DECIMAL(3, 2) DEFAULT 0,
   reason VARCHAR(255),
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   UNIQUE (soldier_id, skip_date, meal_type)

@@ -46,9 +46,8 @@ export const api = {
   addLog: (body) => request('/soldier-logs', { method: 'POST', body }),
   deleteLog: (logId) => request(`/soldier-logs/${logId}`, { method: 'DELETE' }),
   duplicateLogs: (body) => request('/soldier-logs/duplicate', { method: 'POST', body }),
-  getSkips: (soldierId, date) => request(`/soldier-logs/skip/${soldierId}/${date}`),
-  addSkip: (body) => request('/soldier-logs/skip', { method: 'POST', body }),
-  removeSkip: (skipId) => request(`/soldier-logs/skip/${skipId}`, { method: 'DELETE' }),
+  getPortions: (soldierId, date) => request(`/soldier-logs/portion/${soldierId}/${date}`),
+  setPortion: (body) => request('/soldier-logs/portion', { method: 'POST', body }),
 
   // stats
   unitReport: (unitId, year, month) => request(`/units/${unitId}/report/${year}/${month}`),
