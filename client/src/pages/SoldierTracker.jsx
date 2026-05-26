@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useOutletContext } from 'react-router-dom';
 import { api } from '../lib/api';
 import { MEAL_LABELS, todayISO, kcal, shiftDate } from '../lib/format';
 import DateNav from '../components/DateNav';
@@ -15,11 +16,12 @@ const PORTIONS = [
 ];
 
 export default function SoldierTracker() {
-  const [units, setUnits] = useState([]);
-  const [unitId, setUnitId] = useState(null);
-  const [soldiers, setSoldiers] = useState([]);
-  const [soldierId, setSoldierId] = useState(null);
+  const { session } = useOutletContext();
+  const unitId = session.unitId;
+  const soldierId = session.soldierId;
+
   const [date, setDate] = useState(todayISO());
+  const [soldier, setSoldier] = useState(null);
   const [stats, setStats] = useState(null);
   const [logs, setLogs] = useState([]);
   const [unitMeals, setUnitMeals] = useState(null);
@@ -29,18 +31,10 @@ export default function SoldierTracker() {
   const [goalModal, setGoalModal] = useState(false);
 
   useEffect(() => {
-    api.listUnits().then((u) => { setUnits(u); if (u[0]) setUnitId(u[0].id); }).catch((e) => setError(e.message));
-  }, []);
-
-  useEffect(() => {
-    if (!unitId) return;
-    api.listSoldiers(unitId).then((s) => { setSoldiers(s); setSoldierId(s[0]?.id || null); }).catch((e) => setError(e.message));
-  }, [unitId]);
-
-  const selectedSoldier = soldiers.find((s) => s.id === soldierId) || null;
+    api.getSoldier(soldierId).then(setSoldier).catch((e) => setError(e.message));
+  }, [soldierId]);
 
   const load = async () => {
-    if (!soldierId || !unitId) { setStats(null); setLogs([]); setUnitMeals(null); setPortions({}); return; }
     setError('');
     try {
       const [st, lg, um, pr] = await Promise.all([
@@ -54,7 +48,7 @@ export default function SoldierTracker() {
     } catch (e) { setError(e.message); }
   };
 
-  useEffect(() => { load(); }, [soldierId, date]);
+  useEffect(() => { load(); }, [date]);
 
   const addLog = async ({ food, custom, quantity }) => {
     const body = { soldier_id: soldierId, log_date: date, quantity, meal_type: 'snack' };
@@ -83,22 +77,15 @@ export default function SoldierTracker() {
   };
 
   const onGoalsSaved = async () => {
-    if (unitId) setSoldiers(await api.listSoldiers(unitId));
+    setSoldier(await api.getSoldier(soldierId));
     await load();
   };
 
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-3">
-        <select className="input w-auto" value={unitId || ''} onChange={(e) => setUnitId(Number(e.target.value))}>
-          {units.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
-        </select>
-        <select className="input w-auto" value={soldierId || ''} onChange={(e) => setSoldierId(Number(e.target.value))}>
-          {soldiers.length === 0 && <option value="">병사 없음</option>}
-          {soldiers.map((s) => <option key={s.id} value={s.id}>{s.rank} {s.name}</option>)}
-        </select>
         <DateNav date={date} onChange={setDate} />
-        <button className="btn-ghost text-sm" disabled={!selectedSoldier} onClick={() => setGoalModal(true)}>🎯 목표 설정</button>
+        <button className="btn-ghost text-sm" disabled={!soldier} onClick={() => setGoalModal(true)}>🎯 목표 설정</button>
       </div>
 
       {error && <div className="card border-red-200 bg-red-50 p-3 text-sm text-red-600">{error}</div>}
@@ -186,7 +173,7 @@ export default function SoldierTracker() {
       )}
 
       <FoodSearchModal open={modal} onClose={() => setModal(false)} onSelect={addLog} allowCustom />
-      <GoalSettingsModal open={goalModal} soldier={selectedSoldier} onClose={() => setGoalModal(false)} onSaved={onGoalsSaved} />
+      <GoalSettingsModal open={goalModal} soldier={soldier} onClose={() => setGoalModal(false)} onSaved={onGoalsSaved} />
     </div>
   );
 }

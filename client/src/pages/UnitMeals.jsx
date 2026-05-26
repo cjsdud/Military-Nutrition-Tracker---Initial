@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useOutletContext } from 'react-router-dom';
 import { api } from '../lib/api';
 import { MEAL_LABELS, todayISO, kcal, g, formatDateKo, shiftDate } from '../lib/format';
 import DateNav from '../components/DateNav';
@@ -8,20 +9,13 @@ import FoodSearchModal from '../components/FoodSearchModal';
 const TYPES = ['breakfast', 'lunch', 'dinner'];
 
 export default function UnitMeals() {
-  const [units, setUnits] = useState([]);
-  const [unitId, setUnitId] = useState(null);
+  const { session } = useOutletContext();
+  const unitId = session.unitId;
   const [date, setDate] = useState(todayISO());
   const [day, setDay] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [modalType, setModalType] = useState(null);
-
-  useEffect(() => {
-    api.listUnits().then((u) => {
-      setUnits(u);
-      if (u[0]) setUnitId(u[0].id);
-    }).catch((e) => setError(e.message));
-  }, []);
 
   const load = async () => {
     if (!unitId) return;
@@ -60,9 +54,6 @@ export default function UnitMeals() {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-3">
-        <select className="input w-auto" value={unitId || ''} onChange={(e) => setUnitId(Number(e.target.value))}>
-          {units.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
-        </select>
         <DateNav date={date} onChange={setDate} />
         <button className="btn-ghost text-sm" onClick={copyYesterday}>📋 어제 식단 복사</button>
       </div>
