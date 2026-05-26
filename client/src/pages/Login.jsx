@@ -11,6 +11,7 @@ export default function Login({ onLogin }) {
 
   const [unitForm, setUnitForm] = useState(null); // {name, code}
   const [soldierForm, setSoldierForm] = useState(null); // {name, rank}
+  const [seeding, setSeeding] = useState(false);
 
   const reloadUnits = async (selectId) => {
     const u = await api.listUnits();
@@ -19,7 +20,24 @@ export default function Login({ onLogin }) {
     else if (u[0] && !unitId) setUnitId(String(u[0].id));
   };
 
-  useEffect(() => { reloadUnits().catch((e) => setError(e.message)); }, []);
+  // 표준 부대(공개 국군 사단) 불러오기 — 서버가 DB에 직접 적재(멱등)
+  const loadStandardUnits = async () => {
+    setSeeding(true); setError('');
+    try { await api.seedAll(); await reloadUnits(); }
+    catch (e) { setError(e.message); }
+    finally { setSeeding(false); }
+  };
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const u = await api.listUnits();
+        if (u.length <= 2) { await api.seedAll(); await reloadUnits(); return; }
+        setUnits(u);
+        if (u[0] && !unitId) setUnitId(String(u[0].id));
+      } catch (e) { setError(e.message); }
+    })();
+  }, []);
 
   useEffect(() => {
     if (role !== 'soldier' || !unitId) return;
@@ -76,6 +94,9 @@ export default function Login({ onLogin }) {
           </select>
           <button className="btn-ghost whitespace-nowrap px-3" onClick={() => setUnitForm(unitForm ? null : { name: '', code: '' })}>＋ 부대</button>
         </div>
+        <button className="mb-2 text-xs text-brand underline disabled:opacity-50" disabled={seeding} onClick={loadStandardUnits}>
+          {seeding ? '불러오는 중…' : '표준 부대(국군 사단) 불러오기'}
+        </button>
         {unitForm && (
           <div className="mb-3 space-y-2 rounded-lg bg-gray-50 p-3">
             <input className="input" placeholder="부대명 (예: 제5322부대)" value={unitForm.name}
