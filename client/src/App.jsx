@@ -4,6 +4,7 @@ import Layout from './components/Layout';
 import Login from './pages/Login';
 import UnitMeals from './pages/UnitMeals';
 import SoldierTracker from './pages/SoldierTracker';
+import MyStats from './pages/MyStats';
 import Stats from './pages/Stats';
 import { getSession, saveSession, clearSession } from './lib/session';
 
@@ -31,6 +32,7 @@ export default function App() {
           <>
             <Route index element={<Navigate to="/me" replace />} />
             <Route path="/me" element={<SoldierTracker />} />
+            <Route path="/me/stats" element={<MyStats />} />
             <Route path="*" element={<Navigate to="/me" replace />} />
           </>
         )}

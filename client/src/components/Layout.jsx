@@ -6,7 +6,8 @@ const NAV = {
     { to: '/stats', label: '통계', icon: '📊' },
   ],
   soldier: [
-    { to: '/me', label: '내 영양', icon: '🪖' },
+    { to: '/me', label: '내 식단', icon: '🍽️' },
+    { to: '/me/stats', label: '내 통계', icon: '📊' },
   ],
 };
 

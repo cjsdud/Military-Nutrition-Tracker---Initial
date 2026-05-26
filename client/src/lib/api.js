@@ -54,4 +54,5 @@ export const api = {
   unitCoverage: (unitId, year, month) => request(`/unit-coverage/${unitId}/${year}/${month}`),
   soldierDay: (soldierId, date) => request(`/soldier-stats/${soldierId}/${date}`),
   soldierMonth: (soldierId, year, month) => request(`/soldier-stats/${soldierId}/${year}/${month}`),
+  soldierRange: (soldierId, from, to) => request(`/soldier-range-stats/${soldierId}/${from}/${to}`),
 };

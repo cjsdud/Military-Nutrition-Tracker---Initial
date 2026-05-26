@@ -170,18 +170,11 @@ router.get('/soldier-stats/:soldier_id/:date', asyncRoute(async (req, res) => {
   });
 }));
 
-// 병사 월간: 일별 추이
-router.get('/soldier-stats/:soldier_id/:year/:month', asyncRoute(async (req, res) => {
-  const { soldier_id, year, month } = req.params;
-  const { start, end } = monthRange(year, month);
-
-  const { rows: soldierRows } = await query('SELECT * FROM soldiers WHERE id = $1', [soldier_id]);
-  if (!soldierRows[0]) return res.status(404).json({ error: '병사를 찾을 수 없습니다' });
-  const soldier = soldierRows[0];
-
+// 병사 기간 일별 집계 (부대식단 배율 적용 + 개인 로그). [start, end)
+async function soldierDaysInRange(soldier, start, end) {
   const { rows: portionRows } = await query(
     'SELECT skip_date, meal_type, portion FROM soldier_meal_skips WHERE soldier_id = $1 AND skip_date >= $2 AND skip_date < $3',
-    [soldier_id, start, end]
+    [soldier.id, start, end]
   );
   const portionMap = new Map();
   for (const r of portionRows) {
@@ -201,11 +194,7 @@ router.get('/soldier-stats/:soldier_id/:year/:month', asyncRoute(async (req, res
   );
   const dayMap = new Map();
   const ensure = (d) => {
-    if (!dayMap.has(d)) dayMap.set(d, {
-      date: d,
-      unit_total: emptyTotals(MACRO_KEYS),
-      additional_total: emptyTotals(MACRO_KEYS),
-    });
+    if (!dayMap.has(d)) dayMap.set(d, { date: d, unit_total: emptyTotals(MACRO_KEYS), additional_total: emptyTotals(MACRO_KEYS) });
     return dayMap.get(d);
   };
   for (const r of mealRows) {
@@ -223,45 +212,77 @@ router.get('/soldier-stats/:soldier_id/:year/:month', asyncRoute(async (req, res
      FROM soldier_logs sl
      LEFT JOIN foods f ON f.id = sl.food_id
      WHERE sl.soldier_id = $1 AND sl.log_date >= $2 AND sl.log_date < $3`,
-    [soldier_id, start, end]
+    [soldier.id, start, end]
   );
   for (const r of logRows) {
     const d = r.log_date.toISOString().slice(0, 10);
     const n = r.food_id
-      ? scaleFood({
-          calorie: r.food_calorie, protein: r.food_protein,
-          carbohydrate: r.food_carbohydrate, fat: r.food_fat,
-          serving_size: r.food_serving_size,
-        }, r.quantity)
+      ? scaleFood({ calorie: r.food_calorie, protein: r.food_protein, carbohydrate: r.food_carbohydrate, fat: r.food_fat, serving_size: r.food_serving_size }, r.quantity)
       : scaleCustom(r, r.quantity);
     addTotals(ensure(d).additional_total, n);
   }
 
-  const days = Array.from(dayMap.values())
+  return Array.from(dayMap.values())
     .map((d) => {
       const total = emptyTotals(MACRO_KEYS);
       for (const k of MACRO_KEYS) total[k] = round1((d.unit_total[k] || 0) + (d.additional_total[k] || 0));
       return { ...d, ...total };
     })
     .sort((a, b) => a.date.localeCompare(b.date));
+}
 
-  const monthly_avg = emptyTotals(MACRO_KEYS);
+function averageDays(days) {
+  const avg = emptyTotals(MACRO_KEYS);
   if (days.length) {
-    for (const d of days) for (const k of MACRO_KEYS) monthly_avg[k] += d[k] || 0;
-    for (const k of MACRO_KEYS) monthly_avg[k] = round1(monthly_avg[k] / days.length);
+    for (const d of days) for (const k of MACRO_KEYS) avg[k] += d[k] || 0;
+    for (const k of MACRO_KEYS) avg[k] = round1(avg[k] / days.length);
   }
+  return avg;
+}
 
+function soldierGoals(s) {
+  return { calorie: s.daily_calorie_goal, protein: s.daily_protein_goal, carbohydrate: s.daily_carb_goal, fat: s.daily_fat_goal };
+}
+
+function nextDayISO(iso) {
+  const d = new Date(iso + 'T00:00:00Z');
+  d.setUTCDate(d.getUTCDate() + 1);
+  return d.toISOString().slice(0, 10);
+}
+
+// 병사 월간: 일별 추이
+router.get('/soldier-stats/:soldier_id/:year/:month', asyncRoute(async (req, res) => {
+  const { soldier_id, year, month } = req.params;
+  const { start, end } = monthRange(year, month);
+  const { rows: soldierRows } = await query('SELECT * FROM soldiers WHERE id = $1', [soldier_id]);
+  if (!soldierRows[0]) return res.status(404).json({ error: '병사를 찾을 수 없습니다' });
+  const soldier = soldierRows[0];
+  const days = await soldierDaysInRange(soldier, start, end);
   res.json({
     soldier: { id: soldier.id, name: soldier.name, rank: soldier.rank },
     period: `${year}-${String(month).padStart(2, '0')}`,
     days,
-    monthly_average: monthly_avg,
-    goals: {
-      calorie: soldier.daily_calorie_goal,
-      protein: soldier.daily_protein_goal,
-      carbohydrate: soldier.daily_carb_goal,
-      fat: soldier.daily_fat_goal,
-    },
+    monthly_average: averageDays(days),
+    goals: soldierGoals(soldier),
+  });
+}));
+
+// 병사 기간 통계: 임의 날짜 범위 (일/주/월별 집계는 클라이언트에서 수행)
+router.get('/soldier-range-stats/:soldier_id/:from/:to', asyncRoute(async (req, res) => {
+  const { soldier_id, from, to } = req.params;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) {
+    return res.status(400).json({ error: 'from, to는 YYYY-MM-DD 형식' });
+  }
+  const { rows: soldierRows } = await query('SELECT * FROM soldiers WHERE id = $1', [soldier_id]);
+  if (!soldierRows[0]) return res.status(404).json({ error: '병사를 찾을 수 없습니다' });
+  const soldier = soldierRows[0];
+  const days = await soldierDaysInRange(soldier, from, nextDayISO(to));
+  res.json({
+    soldier: { id: soldier.id, name: soldier.name, rank: soldier.rank },
+    from, to,
+    days,
+    average: averageDays(days),
+    goals: soldierGoals(soldier),
   });
 }));
 
