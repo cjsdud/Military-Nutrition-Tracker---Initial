@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { api } from '../lib/api';
 import { MEAL_LABELS, todayISO, kcal, g, formatDateKo, shiftDate } from '../lib/format';
@@ -16,12 +16,23 @@ export default function UnitMeals() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [modalType, setModalType] = useState(null);
+  const autoGen = useRef(new Set());
 
   const load = async () => {
     if (!unitId) return;
     setLoading(true); setError('');
-    try { setDay(await api.getDayMeals(unitId, date)); }
-    catch (e) { setError(e.message); }
+    try {
+      let d = await api.getDayMeals(unitId, date);
+      const empty = !d.breakfast && !d.lunch && !d.dinner;
+      const key = `${unitId}-${date.slice(0, 7)}`;
+      if (empty && !autoGen.current.has(key)) {
+        autoGen.current.add(key);
+        const [y, m] = date.split('-');
+        await api.generateMeals({ unit_id: unitId, year: Number(y), month: Number(m) });
+        d = await api.getDayMeals(unitId, date);
+      }
+      setDay(d);
+    } catch (e) { setError(e.message); }
     finally { setLoading(false); }
   };
 
