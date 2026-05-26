@@ -38,4 +38,38 @@ router.post('/generate-meals', asyncRoute(async (req, res) => {
   res.json({ period: `${y}-${String(m).padStart(2, '0')}`, units: unitIds.length, meal_foods_inserted: total });
 }));
 
+function nextMonth(y, m) {
+  return m === 12 ? { y: y + 1, m: 1 } : { y, m: m + 1 };
+}
+
+// Vercel Cron 전용: 매월 자동 식단 적재 (이번 달 + 다음 달, 전 부대).
+// 식단표는 월 단위로 갱신되므로 매월 1일에 실행되도록 vercel.json crons에 등록.
+router.get('/cron', asyncRoute(async (req, res) => {
+  const secret = process.env.CRON_SECRET;
+  if (secret && req.headers.authorization !== `Bearer ${secret}`) {
+    return res.status(401).json({ error: 'unauthorized' });
+  }
+
+  await ensureFoods(query);
+  await ensureUnits(query);
+  const { rows } = await query('SELECT id FROM units ORDER BY id');
+  const unitIds = rows.map((r) => r.id);
+
+  const now = new Date();
+  const cur = { y: now.getUTCFullYear(), m: now.getUTCMonth() + 1 };
+  const targets = [cur, nextMonth(cur.y, cur.m)];
+
+  let total = 0;
+  for (const t of targets) {
+    const dates = monthDates(t.y, t.m);
+    for (const uid of unitIds) total += await generateMealsForUnit(query, uid, dates);
+  }
+  res.json({
+    ok: true,
+    units: unitIds.length,
+    months: targets.map((t) => `${t.y}-${String(t.m).padStart(2, '0')}`),
+    meal_foods_inserted: total,
+  });
+}));
+
 module.exports = router;
