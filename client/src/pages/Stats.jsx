@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useOutletContext } from 'react-router-dom';
 import {
   ResponsiveContainer, LineChart, Line, BarChart, Bar,
   XAxis, YAxis, Tooltip, CartesianGrid, Legend,
@@ -12,16 +13,12 @@ function ym() {
 }
 
 export default function Stats() {
-  const [units, setUnits] = useState([]);
-  const [unitId, setUnitId] = useState(null);
+  const { session } = useOutletContext();
+  const unitId = session.unitId;
   const [{ year, month }, setPeriod] = useState(ym());
   const [report, setReport] = useState(null);
   const [coverage, setCoverage] = useState(null);
   const [error, setError] = useState('');
-
-  useEffect(() => {
-    api.listUnits().then((u) => { setUnits(u); if (u[0]) setUnitId(u[0].id); }).catch((e) => setError(e.message));
-  }, []);
 
   useEffect(() => {
     if (!unitId) return;
@@ -53,9 +50,6 @@ export default function Stats() {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-3">
-        <select className="input w-auto" value={unitId || ''} onChange={(e) => setUnitId(Number(e.target.value))}>
-          {units.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
-        </select>
         <div className="flex items-center gap-2">
           <button className="btn-ghost px-3" onClick={() => shiftMonth(-1)}>‹</button>
           <span className="font-semibold">{year}년 {month}월</span>
