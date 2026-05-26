@@ -30,6 +30,8 @@ export const api = {
   updateMeal: (mealId, body) => request(`/meals/${mealId}`, { method: 'PUT', body }),
   deleteMeal: (mealId) => request(`/meals/${mealId}`, { method: 'DELETE' }),
   copyMeals: (body) => request('/meals/copy', { method: 'POST', body }),
+  generateMeals: (body) => request('/admin/generate-meals', { method: 'POST', body }),
+  seedAll: () => request('/admin/seed', { method: 'POST' }),
 
   // soldiers
   listSoldiers: (unitId) => request(`/soldiers${unitId ? `?unit_id=${unitId}` : ''}`),

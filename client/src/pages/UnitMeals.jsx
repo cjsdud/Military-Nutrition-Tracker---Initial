@@ -51,11 +51,24 @@ export default function UnitMeals() {
     await load();
   };
 
+  const autoGenerate = async () => {
+    const [y, m] = date.split('-');
+    if (!confirm(`${y}년 ${Number(m)}월 식단을 자동 생성할까요? (이미 입력된 끼니는 그대로 유지됩니다)`)) return;
+    setLoading(true); setError('');
+    try {
+      const r = await api.generateMeals({ unit_id: unitId, year: Number(y), month: Number(m) });
+      await load();
+      alert(`${r.period} 식단 자동 생성 완료 (${r.meal_foods_inserted}개 항목 추가)`);
+    } catch (e) { setError(e.message); }
+    finally { setLoading(false); }
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-3">
         <DateNav date={date} onChange={setDate} />
         <button className="btn-ghost text-sm" onClick={copyYesterday}>📋 어제 식단 복사</button>
+        <button className="btn-primary text-sm" onClick={autoGenerate}>📅 이번 달 식단 자동 생성</button>
       </div>
 
       {error && <div className="card border-red-200 bg-red-50 p-3 text-sm text-red-600">{error}</div>}
