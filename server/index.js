@@ -8,6 +8,7 @@ const mealsRouter = require('./routes/meals');
 const soldiersRouter = require('./routes/soldiers');
 const soldierLogsRouter = require('./routes/soldierLogs');
 const statsRouter = require('./routes/stats');
+const adminRouter = require('./routes/admin');
 
 const app = express();
 app.use(cors());
@@ -26,6 +27,7 @@ app.use('/api/foods', foodsRouter);
 app.use('/api/meals', mealsRouter);
 app.use('/api/soldiers', soldiersRouter);
 app.use('/api/soldier-logs', soldierLogsRouter);
+app.use('/api/admin', adminRouter);
 app.use('/api', statsRouter);
 
 app.use((req, res) => {
