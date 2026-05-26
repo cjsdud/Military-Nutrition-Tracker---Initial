@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { api } from '../lib/api';
 import { MEAL_LABELS, todayISO, kcal, shiftDate } from '../lib/format';
@@ -29,6 +29,7 @@ export default function SoldierTracker() {
   const [error, setError] = useState('');
   const [modal, setModal] = useState(false);
   const [goalModal, setGoalModal] = useState(false);
+  const autoGen = useRef(new Set());
 
   useEffect(() => {
     api.getSoldier(soldierId).then(setSoldier).catch((e) => setError(e.message));
@@ -37,10 +38,18 @@ export default function SoldierTracker() {
   const load = async () => {
     setError('');
     try {
-      const [st, lg, um, pr] = await Promise.all([
+      let um = await api.getDayMeals(unitId, date);
+      const empty = !um.breakfast && !um.lunch && !um.dinner;
+      const key = `${unitId}-${date.slice(0, 7)}`;
+      if (empty && !autoGen.current.has(key)) {
+        autoGen.current.add(key);
+        const [y, m] = date.split('-');
+        await api.generateMeals({ unit_id: unitId, year: Number(y), month: Number(m) });
+        um = await api.getDayMeals(unitId, date);
+      }
+      const [st, lg, pr] = await Promise.all([
         api.soldierDay(soldierId, date),
         api.getLogs(soldierId, date),
-        api.getDayMeals(unitId, date),
         api.getPortions(soldierId, date),
       ]);
       setStats(st); setLogs(lg); setUnitMeals(um);
